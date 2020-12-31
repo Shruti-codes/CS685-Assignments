@@ -1,0 +1,12 @@
+Run assign2.sh after making working directory to folder - '2011101-assign2' to run the entire assignment by command -> sh assign2.sh
+
+Runtime = 226 seconds
+
+Python packages required :
+
+- csv	: to manage data
+- pandas : for dataset handling
+- collections : for maintaining dictionaries
+- networkx : for graph handling and shortest path calculation
+- operator : for sorting csv files
+- urllib : for parsing article-names

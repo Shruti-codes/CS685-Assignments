@@ -1,0 +1,135 @@
+import pandas as pd
+import csv
+from collections import defaultdict
+import networkx as nx
+
+cat = pd.read_csv("category-paths.csv", header=None, index_col=0, squeeze=True)
+cid = pd.read_csv("category-ids.csv", header=None,index_col=0, squeeze=True).to_dict()
+
+f = open("category-subtree-paths.csv", 'w')
+npath = csv.writer(f)
+
+l=[]
+lid = []
+for row,v in cid.items():
+	l.append(row)
+	lid.append(v)
+
+cl = [0]*147	#no of categories
+clp = [0]*147	#no of paths
+
+cat_dict = defaultdict(list)	#dict of subcat parents
+for x in l:
+	for y in l:
+		if(x.startswith(y) and len(x)>=len(y) and x!=y):
+			cat_dict[cid[x]].append(cid[y])
+
+# print(cat_dict)
+
+p = pd.read_csv("wikispeedia_paths-and-graph/paths_finished.tsv" ,sep='\t', skiprows=15, header=None,names=['hashedIpAddress','timestamp','durationInSec','path','rating'])
+path = p.iloc[:,3:4]	#finished paths 
+
+art_cat = defaultdict(list)
+myFile = open ("article-categories.csv","r")
+archive = csv.reader(myFile, delimiter=',')
+
+for rows in archive:
+	art_cat[rows[0]] = (rows[1:])
+
+art = pd.read_csv("article-ids.csv", index_col=0, squeeze=True).to_dict()
+
+DG = nx.DiGraph()
+df3 = pd.read_csv('edges.csv')
+for row in df3.itertuples(name='Pandas'):
+    DG.add_edge(row[1],row[2])
+
+path_visited = {}
+def findShortPath(pair):
+    source = pair.split(',')[0]
+    target = pair.split(',')[1]
+    try:
+        _ = nx.shortest_path(DG, source=source, target=target)
+        # print(_)
+        path_visited[pair] = _
+        
+    except:
+        print('')
+
+for row in path.itertuples(name='Pandas'):
+	clb = [False]*147
+	b = row[1].count('<')
+	s=""
+	s1 = row[1].split(';')
+	if(b):
+		for i in range(len(s1)):
+			if(not s):
+				s = s1[i] + ';'
+			else:
+				s = s+ ';'+ s1[i]
+			
+			if(s1[i]=='<'):
+				ind = s[:s.rfind(";")].rfind(";")
+				s =  s[:ind]
+	if(not s):
+		s=row[1]
+	
+	sub = str(s).split(';')	#articles in one path
+	source = art[sub[0]]
+	target = art[sub[len(sub)-1]]
+	pair = source+','+target
+	findShortPath(pair)
+	# c=[]
+	if(len(sub)>1):
+		for x in sub:	#for every non-empty article
+			if(x!=''):
+				aid = art[x]				#get article id of article in path
+					# c = art_cat[aid]		#get categories of that article
+				for cx in art_cat[aid]:
+					j=cat_dict[cx]	#get subcat of that cat
+					m= int(cx[1:])
+					cl[m]+=1
+					if(clb[m]==False):	#to just visit cat once in a path
+						clb[m] = True
+						clp[m]+=1		#if this cat is visited in this path or not
+					
+					for k in j:
+						i = int(k[1:])
+						cl[i]+=1; #number of times this category comes
+
+						if(clb[i]==False):	#to just visit cat once in a path
+							clb[i] = True
+							clp[i]+=1		#if this cat is visited in this path or not
+
+#shortest paths
+scl = [0]*147	#no of categories
+sclp = [0]*147	#no of paths
+
+for row in path.itertuples(name='Pandas'):
+	sclb = [False]*147
+	sub = str(row[1]).split(';')	#articles in one path
+	source = art[sub[0]]
+	target = art[sub[len(sub)-1]]
+	pair = source+','+target #start and end node
+
+	if(pair in path_visited.keys()):
+		x = path_visited[pair]	#shortest path route for that pair
+		for cx in x:		#for every article in route
+			for cxx in art_cat[cx]:		#for category of that article
+				j=cat_dict[cxx]
+
+				m= int(cxx[1:])
+				scl[m]+=1
+				if(sclb[m]==False):	#to just visit cat once in a path
+					sclb[m] = True
+					sclp[m]+=1		#if this cat is visited in this path or not
+				
+				for k in j:
+					i = int(k[1:])
+					scl[i]+=1; #number of times this category comes
+
+					if(sclb[i]==False):	#to just visit cat once in a path
+						sclb[i] = True
+						sclp[i]+=1		#if this cat is visited in this path or not
+
+for i in range(1,len(cl)):
+	npath.writerow(["C"+str(i).zfill(4), clp[i], cl[i],sclp[i], scl[i]])
